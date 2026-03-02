@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pywrdrb-mcp"
+version = "0.1.0"
+description = "MCP server for the Pywr-DRB water resource model codebase"
+requires-python = ">=3.10"
+dependencies = ["fastmcp>=2.0"]
+
+[project.scripts]
+pywrdrb-mcp = "pywrdrb_mcp.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "pywrdrb-mcp": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "C:/Users/tjame/Desktop/Research/DRB/Pywr-DRB/pywrdrb-mcp",
+        "python",
+        "-m",
+        "pywrdrb_mcp.server"
+      ]
+    }
+  }
+}
