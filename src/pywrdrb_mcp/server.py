@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
 # Import and register tools, resources, prompts.
 # Each sub-module registers its functions on the `mcp` instance.
-from pywrdrb_mcp.tools import topology, code, parameters, model_builder, data  # noqa: E402, F401
+from pywrdrb_mcp.tools import topology, code, parameters, model_builder, data, lists, data_object, ffmp_data  # noqa: E402, F401
 from pywrdrb_mcp.resources import static  # noqa: E402, F401
 from pywrdrb_mcp.prompts import templates  # noqa: E402, F401
 

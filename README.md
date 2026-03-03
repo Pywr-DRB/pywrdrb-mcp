@@ -55,24 +55,31 @@ uv run pytest tests/ -v
 
 ## What's Included
 
-### Tools (11)
+### Tools (19)
 
-| Tool | Purpose |
-|---|---|
-| `get_node_topology` | River network connections, lags, and gage IDs for a node |
-| `get_reservoir_details` | Reservoir type, classification, and data source mappings |
-| `get_file_contents` | Read any file in the pywrdrb source tree |
-| `search_codebase` | Regex search across all source files |
-| `get_module_overview` | Module docstring, classes, and functions summary |
-| `get_parameter_class_info` | Full class details (methods, signatures, docstrings) |
-| `get_model_builder_options` | Options dataclass fields with types and defaults |
-| `get_model_builder_method` | Source code for any ModelBuilder method |
-| `get_operational_constants` | Unit conversion constants |
-| `get_repo_status` | Git branch, recent commits, modified files |
-| `get_data_file_list` | Enumerate data files on disk |
-| `refresh_index` | Rebuild the cached index without restarting |
+| Tool | Module | Purpose |
+|---|---|---|
+| `get_node_topology` | topology | River network connections, lags, and gage IDs for a node |
+| `get_reservoir_details` | topology | Reservoir type, classification, and data source mappings |
+| `get_file_contents` | code | Read any file in the pywrdrb source tree |
+| `search_codebase` | code | Regex search across all source files |
+| `get_module_overview` | code | Module docstring, classes, and functions summary |
+| `get_parameter_class_info` | parameters | Full class details (methods, signatures, docstrings) |
+| `get_model_builder_options` | model_builder | Options dataclass fields with types and defaults |
+| `get_model_builder_method` | model_builder | Source code for any ModelBuilder method |
+| `get_operational_constants` | data | Unit conversion constants |
+| `get_repo_status` | data | Git branch, recent commits, modified files |
+| `get_data_file_list` | data | Enumerate data files on disk |
+| `refresh_index` | data | Rebuild the cached index without restarting |
+| `get_node_list` | lists | All nodes by type (NYC, STARFIT, flood, etc.) |
+| `get_reservoir_list` | lists | All 17 reservoirs with type classifications |
+| `get_parameter_list` | lists | All parameter classes grouped by module |
+| `get_results_set_list` | lists | Available results set options for loading output |
+| `get_inflow_type_list` | lists | Available inflow data types with date ranges |
+| `get_data_object_info` | data_object | Data class hierarchy, access patterns, loading methods |
+| `get_ffmp_data` | ffmp_data | FFMP operational constants, profiles, and lower basin policy |
 
-### Resources (16+)
+### Resources (15)
 
 - **Topology:** network graph, reservoir list, node list
 - **API:** parameter class index, ModelBuilder methods, Data loader methods
@@ -83,14 +90,26 @@ uv run pytest tests/ -v
 
 ### Prompts (6)
 
+All prompts use the `how_to_*` naming convention to indicate they are instructional guides.
+
 | Prompt | Workflow |
 |---|---|
-| `add-new-parameter` | Pattern for creating a custom Pywr Parameter |
-| `debug-simulation` | Step-by-step simulation diagnostics |
-| `understand-node` | Gather all info about a river network node |
-| `modify-ffmp-rules` | Change FFMP rules via NYCOperationsConfig |
-| `add-inflow-source` | Add a new hydrologic model inflow dataset |
-| `review-model-output` | Load and interpret simulation results |
+| `how_to_add_parameter` | Pattern for creating a custom Pywr Parameter |
+| `how_to_debug_simulation` | Step-by-step simulation diagnostics |
+| `how_to_understand_node` | Gather all info about a river network node |
+| `how_to_modify_ffmp_rules` | Change FFMP rules via NYCOperationsConfig |
+| `how_to_add_inflow_source` | Add a new hydrologic model inflow dataset |
+| `how_to_review_output` | Load and interpret simulation results |
+
+### Examples
+
+See the `examples/` directory for usage guides:
+
+- `01_exploring_the_network.md` — Node topology, reservoir details, network graph
+- `02_working_with_parameters.md` — Listing, inspecting, and adding parameter classes
+- `03_ffmp_operations.md` — FFMP data queries, rules, and scenario modification
+- `04_simulation_results.md` — Data class, results sets, loading output
+- `05_building_models.md` — ModelBuilder options, inflow sources, debugging
 
 ## Architecture
 
@@ -100,11 +119,12 @@ pywrdrb-mcp/
 │   ├── server.py          # FastMCP entry point
 │   ├── config.py          # PYWRDRB_ROOT path
 │   ├── index/             # AST-based static analysis engine
-│   ├── tools/             # 11 MCP tools
-│   ├── resources/         # 16+ MCP resources
-│   ├── prompts/           # 6 MCP prompt templates
+│   ├── tools/             # 19 MCP tools (8 modules)
+│   ├── resources/         # 15 MCP resources
+│   ├── prompts/           # 6 MCP prompt templates (how_to_* convention)
 │   └── content/           # Hand-written domain knowledge (markdown)
-└── tests/                 # 68 tests
+├── examples/              # Usage guides and workflow examples
+└── tests/
 ```
 
 The server reads from the Pywr-DRB source tree at startup via `ast.parse()` and `ast.literal_eval()` — it never imports or executes pywrdrb code.

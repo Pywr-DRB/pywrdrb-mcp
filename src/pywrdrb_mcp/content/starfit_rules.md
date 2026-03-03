@@ -18,35 +18,29 @@ translates daily storage, inflow, and day-of-year into a constrained release dec
 
 ## Reservoirs Using STARFIT
 
-The following 14 reservoirs use STARFIT-based operating rules (`starfit_reservoir_list`):
+Use `get_reservoir_list()` for the current full list with type classifications. The STARFIT
+reservoir list contains 14 reservoirs. Key subsets:
 
-| Reservoir | Notes |
-|---|---|
-| wallenpaupack | |
-| prompton | |
-| shoholaMarsh | |
-| mongaupeCombined | |
-| beltzvilleCombined | DRBC lower-basin; modified parameters; R_max overridden |
-| fewalter | DRBC lower-basin; modified parameters; R_max overridden |
-| merrillCreek | |
-| hopatcong | |
-| nockamixon | DRBC lower-basin; R_max overridden |
-| assunpink | |
-| ontelaunee | |
-| stillCreek | |
-| blueMarsh | DRBC lower-basin; modified parameters; R_max overridden |
-| greenLane | |
+- **DRBC lower-basin reservoirs** (`beltzvilleCombined`, `blueMarsh`, `nockamixon`): R_max
+  overridden by DRBC maximum discharge constraints.
+- **Modified STARFIT reservoirs** (`blueMarsh`, `beltzvilleCombined`, `fewalter`): Use
+  DRBC-adjusted capacity and mean flow values (prefixed `modified_` in `istarf_conus.csv`).
+- The three NYC reservoirs (Cannonsville, Pepacton, Neversink) use separate NYC FFMP rules
+  and are **not** governed by STARFIT.
 
-The three NYC reservoirs (Cannonsville, Pepacton, Neversink) use separate NYC FFMP rules and
-are **not** governed by STARFIT.
+Note: `fewalter` uses modified STARFIT parameters but is not in the DRBC lower-basin
+reservoir list. `nockamixon` is in the DRBC lower-basin list but does not use modified
+STARFIT parameters.
 
 ---
 
 ## Parameters File: `istarf_conus.csv`
 
 Default STARFIT parameters are loaded from `istarf_conus.csv` (located under
-`pn.operational_constants`). The file is indexed by reservoir name and contains the following
-columns used at runtime:
+`data/operational_constants/`). Use `get_data_file_list("operational_constants")` to see
+available data files.
+
+The file is indexed by reservoir name and contains the following column groups:
 
 | Column group | Variables | Purpose |
 |---|---|---|
@@ -57,9 +51,8 @@ columns used at runtime:
 | Adjustment | `Release_c`, `Release_p1`, `Release_p2` | Intercept and linear coefficients for storage/inflow adjustment |
 | Physical bounds | `Release_min`, `Release_max` | Multipliers on I_bar for R_min and R_max |
 
-For reservoirs in `modified_starfit_reservoir_list` (`blueMarsh`, `beltzvilleCombined`,
-`fewalter`) the lookup key is prefixed with `modified_` to use DRBC-adjusted capacity and
-flow values.
+For reservoirs in `modified_starfit_reservoir_list` the lookup key is prefixed with
+`modified_` to use DRBC-adjusted capacity and flow values.
 
 ---
 
@@ -145,9 +138,10 @@ This ensures the final release is non-negative, does not exceed the water availa
 large enough to prevent the reservoir from exceeding capacity.
 
 **R_min and R_max overrides:** For DRBC lower-basin reservoirs (`beltzvilleCombined`,
-`blueMarsh`, `nockamixon`, `fewalter`) the STARFIT-derived R_min and R_max values are replaced
+`blueMarsh`, `nockamixon`) the STARFIT-derived R_min and R_max values are replaced
 by DRBC conservation-release and maximum-discharge constants defined in
-`pywrdrb/parameters/lower_basin_ffmp.py`.
+`pywrdrb/parameters/lower_basin_ffmp.py`. Use `get_ffmp_data("lower_basin")` to see
+current conservation release and max discharge values.
 
 ---
 

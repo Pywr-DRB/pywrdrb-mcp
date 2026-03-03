@@ -14,15 +14,17 @@ Pywr-DRB implements FFMP rules via a set of custom Pywr `Parameter` subclasses i
 
 The FFMP defines seven operational zones based on storage relative to seasonal rule curves:
 
-| Level | Description         | Drought factor (NYC delivery) |
-|-------|---------------------|-------------------------------|
-| 1a    | Flood / spill zone  | 1e6 (unconstrained)           |
-| 1b    | Spill mitigation    | 1e6 (unconstrained)           |
-| 1c    | Upper normal        | 1e6 (unconstrained)           |
-| 2     | Normal operations   | 1e6 (unconstrained)           |
-| 3     | Watch               | 0.85                          |
-| 4     | Warning             | 0.70                          |
-| 5     | Emergency (drought) | 0.65                          |
+| Level | Description         |
+|-------|---------------------|
+| 1a    | Flood / spill zone  |
+| 1b    | Spill mitigation    |
+| 1c    | Upper normal        |
+| 2     | Normal operations   |
+| 3     | Watch               |
+| 4     | Warning             |
+| 5     | Emergency (drought) |
+
+NYC delivery drought factors per level are available via `get_ffmp_data("constants")`.
 
 Two drought level indices are tracked at every timestep:
 
@@ -54,15 +56,11 @@ Level 1a is implicitly above level1b (full pool / spill). The drought level inte
 
 ### Reservoir-Specific Conservation Releases
 
-Each reservoir has a **baseline MRF** (MGD) scaled by a seasonal drought-level factor:
+Each reservoir has a **baseline MRF** (MGD) scaled by a seasonal drought-level factor.
+Use the `get_ffmp_data("constants")` tool for current baseline values, or
+`get_ffmp_data("mrf_daily")` for the full daily factor profiles.
 
-| Reservoir     | Baseline MRF (MGD) |
-|---------------|--------------------|
-| Cannonsville  | 122.8              |
-| Pepacton      | 64.63              |
-| Neversink     | 48.47              |
-
-Daily MRF factors (`level{N}_factor_mrf_{reservoir}`) are indexed by drought level and day of year (366 values). Example: `level2_factor_mrf_cannonsville` ranges 1.5–7.5 across the year.
+Daily MRF factors (`level{N}_factor_mrf_{reservoir}`) are indexed by drought level and day of year (366 values).
 
 **Final reservoir MRF target:**
 ```
@@ -78,18 +76,13 @@ factor = min(max(D_agg - 2, 0), 1) * factor_agg
 
 When the system is in Level 2 or deeper drought (`D_agg >= 3`), the aggregate factor fully applies. When in Level 1 (flood zone, `D_agg < 2`), the individual reservoir factor fully applies. Between Levels 1 and 2, the two factors blend linearly. This allows flood control to be driven by each reservoir's own storage while drought operations use system-wide storage.
 
-An optional **flood curtailment mode** caps the release factor at the L2 daily profile when downstream stage at a reference gage exceeds FFMP action thresholds (Hale Eddy > 9 ft for Cannonsville, Fishs Eddy > 11 ft for Pepacton, Bridgeville > 12 ft for Neversink).
+An optional **flood curtailment mode** caps the release factor at the L2 daily profile when downstream stage at a reference gage exceeds the FFMP action threshold. Use `get_file_contents("flood_thresholds.py")` for current threshold values per location.
 
 ### Downstream Flow Targets
 
-The FFMP also sets minimum flow targets at two downstream gages:
-
-| Gage                     | Baseline (MGD) |
-|--------------------------|----------------|
-| Delaware at Montague, NJ | 1131.05        |
-| Delaware at Trenton, NJ  | 1938.95        |
-
-Monthly multiplier factors (`level{N}_factor_mrf_delMontague` / `delTrenton`) scale these baselines by drought level across 12 calendar months. For example, Montague Level 5 ranges 0.77–0.91 seasonally; Trenton Levels 3–5 all use 0.9 year-round.
+The FFMP also sets minimum flow targets at two downstream gages (Montague and Trenton).
+Use `get_ffmp_data("constants")` for baseline values, and `get_ffmp_data("mrf_monthly")`
+for the monthly multiplier factors that scale these baselines by drought level and calendar month.
 
 ---
 
@@ -97,19 +90,17 @@ Monthly multiplier factors (`level{N}_factor_mrf_delMontague` / `delTrenton`) sc
 
 ### NYC Delivery
 
-- **Baseline limit:** 800 MGD (`max_flow_baseline_delivery_nyc`)
-- **Drought factor** applied per aggregate drought level (see table above)
 - **Running average constraint** (`FfmpNycRunningAvgParameter`): tracks cumulative delivery against a moving-average budget. The budget updates daily as:
   ```
   max_delivery_t = max_delivery_{t-1} - flow_{t-1} + max_avg_delivery
   ```
-  On **May 31** each year the budget resets to the full baseline. Values cannot go negative.
+  The budget resets annually (see `delivery_reset_month`/`delivery_reset_day` in constants). Values cannot go negative.
 
 ### NJ Delivery
 
-- **Daily baseline:** 120 MGD; **monthly average baseline:** 100 MGD
-- **Drought factors** by level: `[1, 1, 1, 1, 1, 0.9, 0.8]` (Levels 1a–5)
 - **Running average constraint** (`FfmpNjRunningAvgParameter`): similar to NYC but resets on the **first of each month** under normal conditions (factor = 1.0) and resets immediately whenever the drought factor changes between timesteps. Also capped by the daily limit.
+
+Use `get_ffmp_data("constants")` for current NYC/NJ delivery baselines, limits, and drought factors.
 
 ---
 
@@ -126,13 +117,8 @@ excess_volume = current_volume - level1c_volume + weekly_rolling_mean_inflow * 7
 flood_release = max(min(excess_volume / 7 - mrf_target, max_release - mrf_target), 0)
 ```
 
-Maximum flood releases (from FFMP Table 5, in CFS):
-
-| Reservoir    | Max Flood Release (CFS) |
-|--------------|------------------------|
-| Cannonsville | 4200                   |
-| Pepacton     | 2400                   |
-| Neversink    | 3400                   |
+Maximum flood releases are defined in FFMP Table 5.
+Use `get_ffmp_data("constants")` for current max flood release values per reservoir.
 
 When downstream stage exceeds the action threshold during Zone L1, the excess flood release is suppressed (returns 0) and the MRF factor is separately capped at the L2 level by `NYCCombinedReleaseFactor`.
 
@@ -165,18 +151,13 @@ Releases to meet downstream MRF targets are distributed across Cannonsville, Pep
 
 ## IERQ / Bank Storage
 
-The **Interim Excess Release Quantity (IERQ)** is a pool of pre-allocated water volume that can supplement Trenton equivalent flow targets beyond standard MRF obligations. Per FFMP Section 3.c, the total IERQ budget is 10,000 MG per year, split across four banks:
+The **Interim Excess Release Quantity (IERQ)** is a pool of pre-allocated water volume that can supplement Trenton equivalent flow targets beyond standard MRF obligations. Per FFMP Section 3.c, the total IERQ budget is approximately 10,000 MG per year, split across four banks (Trenton, thermal mitigation, rapid flow change, NJ diversion amelioration).
 
-| Bank                     | Annual Volume |
-|--------------------------|--------------|
-| Trenton equivalent flow  | 6,090 MG     |
-| Thermal mitigation       | 1,620 MG     |
-| Rapid flow change        | 650 MG       |
-| NJ diversion amelioration| 1,650 MG     |
+Use `get_parameter_class_info("IERQRelease_step1")` to see current bank volume allocations.
 
 Currently, only the **Trenton bank** is implemented (`IERQRelease_step1` in `banks.py`). The bank:
 
-- Resets to its full 6,090 MG allocation on **June 1** each year.
+- Resets to its full allocation on **May 31** each year (same as NYC delivery reset).
 - Each day, the allowable release is `min(bank_remaining, trenton_release_needed)`.
 - The released volume is subtracted from `bank_remaining` after each timestep.
 - When NYC is in drought, the bank should be set to 0 (not yet automated).
@@ -189,63 +170,21 @@ The remaining three banks (thermal mitigation, rapid flow change, NJ diversion a
 
 `NYCOperationsConfig` (in `src/pywrdrb/parameters/nyc_operations_config.py`) is a configuration container that holds all FFMP parameters and can be passed to `ModelBuilder` to override defaults.
 
-### Key attributes
+Use `get_parameter_class_info("NYCOperationsConfig")` for the full API, including all
+method signatures and parameter types. Key methods:
 
-| Attribute              | Content                                                  |
-|------------------------|----------------------------------------------------------|
-| `storage_zones_df`     | DataFrame of storage zone thresholds (366 cols × 6 rows)|
-| `mrf_factors_daily_df` | Daily MRF release factor profiles (366 cols)             |
-| `mrf_factors_monthly_df`| Monthly downstream flow factor profiles (12 cols)       |
-| `constants`            | Dict of scalar parameters (baselines, limits, factors)   |
-
-### Loading defaults
-
-```python
-from pywrdrb.parameters.nyc_operations_config import NYCOperationsConfig
-
-config = NYCOperationsConfig.from_defaults()          # from package CSVs
-config = NYCOperationsConfig.from_defaults(data_dir='path/to/csvs')  # custom CSVs
-```
-
-### Updating parameters
-
-```python
-# Delivery limits
-config.update_delivery_constraints(max_nyc_delivery=850, max_nj_daily=130)
-
-# MRF baselines (MGD)
-config.update_mrf_baselines(cannonsville=135.0, montague=1200.0)
-
-# Seasonal storage zone (366 values, fractions of capacity)
-config.update_storage_zones(level='level2', daily_values=new_array)
-
-# Daily MRF factor for a specific reservoir × drought level
-config.update_mrf_factors(reservoir='cannonsville', level='level2', daily_factors=arr)
-
-# Flood release caps (CFS)
-config.update_flood_limits(max_release_cannonsville=5000)
-```
-
-### Passing to ModelBuilder
-
-```python
-from pywrdrb.model_builder import ModelBuilder
-
-model = ModelBuilder(
-    start_date="2000-01-01",
-    end_date="2010-12-31",
-    inflow_type="nhmv10_withObsScaled",
-    nyc_operations_config=config
-)
-```
+- `from_defaults(data_dir=None)` — Load default configuration from package CSVs
+- `update_storage_zones(...)` — Modify seasonal storage zone thresholds
+- `update_mrf_factors(...)` — Modify MRF release factors (daily or monthly)
+- `update_delivery_constraints(...)` — Modify NYC/NJ delivery limits and drought factors
+- `update_flood_limits(...)` — Modify maximum flood release caps
+- `update_mrf_baselines(...)` — Modify minimum required flow baselines
+- `to_csv(output_dir)` — Export configuration to CSV files
+- `copy()` — Create a deep copy
 
 If `nyc_operations_config=None` (the default), `ModelBuilder` calls `NYCOperationsConfig.from_defaults()` internally, preserving backward compatibility.
 
-### Validation and export
-
-- `_validate()` is called after every update: checks for 366 daily columns, 12 monthly columns, required constant keys, and all 7 drought-level delivery factors. Raises errors for structural problems; warns for missing optional keys.
-- Semantic consistency (e.g., `level2 > level3`) is **not** enforced automatically.
-- `config.copy()` returns a deep copy; `config.to_csv(dir)` exports all DataFrames and constants to the standard CSV filenames.
+Validation (`_validate()`) checks for 366 daily columns, 12 monthly columns, required constant keys, and all 7 drought-level delivery factors. Semantic consistency (e.g., `level2 > level3`) is **not** enforced automatically.
 
 ---
 
@@ -269,11 +208,13 @@ All custom Pywr parameters in `ffmp.py` and `banks.py` must be registered before
 
 ## Data Sources
 
-All default parameters are loaded from `src/pywrdrb/data/operational_constants/`:
+All default parameters are loaded from `src/pywrdrb/data/operational_constants/`.
+Use the `get_ffmp_data` tool to query any of these data sources:
 
-- **`constants.csv`**: ~31 scalar parameters (MRF baselines, delivery limits, drought factors, flood caps, reset dates).
-- **`ffmp_reservoir_operation_daily_profiles.csv`**: ~32 profiles × 366 day-of-year columns (storage zone thresholds + daily MRF factors).
-- **`ffmp_reservoir_operation_monthly_profiles.csv`**: ~16 profiles × 12 month columns (Montague and Trenton downstream flow factors).
+- `get_ffmp_data("constants")` — Scalar parameters (MRF baselines, delivery limits, drought factors, flood caps, reset dates)
+- `get_ffmp_data("storage_zones")` — Daily storage zone threshold profiles (366 day-of-year values)
+- `get_ffmp_data("mrf_daily")` — Daily MRF release factor profiles per reservoir × drought level
+- `get_ffmp_data("mrf_monthly")` — Monthly downstream flow factors for Montague and Trenton
 
 ---
 

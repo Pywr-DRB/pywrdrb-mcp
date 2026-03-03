@@ -38,16 +38,18 @@ mb.write_model(model_filename)
 
 ### Key `Options` Fields
 
-Pass an `Options` instance to `ModelBuilder` to override defaults:
+Pass an `Options` instance to `ModelBuilder` to override defaults. Use
+`get_model_builder_options()` for the complete list of fields with types,
+defaults, and descriptions.
 
 ```python
 opts = pywrdrb.Options(
     NSCENARIOS=1,
-    nyc_nj_demand_source="historical",   # "historical" | "custom" | "constant_max"
-    initial_volume_frac=0.8,             # starting reservoir storage fraction
-    flow_prediction_mode="perfect_foresight",  # or "regression_disagg"
+    nyc_nj_demand_source="historical",
+    initial_volume_frac=0.8,
+    flow_prediction_mode="perfect_foresight",
     enable_nyc_flood_operations=False,
-    use_trimmed_model=False,             # True cuts runtime ~50-70%
+    use_trimmed_model=False,
 )
 
 mb = pywrdrb.ModelBuilder(
@@ -57,8 +59,6 @@ mb = pywrdrb.ModelBuilder(
     options=opts,
 )
 ```
-
-`flow_prediction_mode`: `"perfect_foresight"` uses actual future observations (default, best for retrospective runs); `"regression_disagg"` uses autoregressive predictions (more operationally realistic).
 
 ---
 
@@ -116,20 +116,14 @@ print(df_res_storage[['cannonsville', 'pepacton', 'neversink']].head())
 | `data.export(path)` | Save all loaded data to a single HDF5 file |
 | `data.load_from_export(path)` | Reload previously exported data |
 
-Full list of `results_sets` options: https://pywr-drb.github.io/Pywr-DRB/results_set_options.html
+Use `get_results_set_list()` for the full list of available `results_sets` options.
 
 ---
 
 ## Common Inflow Types and Date Ranges
 
-| `inflow_type` | Available Range | Notes |
-|---|---|---|
-| `nhmv10` | 1983-10-01 – 2016-12-31 | NHM v1.0 streamflow |
-| `nhmv10_withObsScaled` | 1983-10-01 – 2016-12-31 | NHM v1.0 with observed scaling |
-| `nwmv21` | 1983-10-01 – 2016-12-31 | NWM v2.1 streamflow |
-| `nwmv21_withObsScaled` | 1983-10-01 – 2016-12-31 | NWM v2.1 with observed scaling (recommended) |
-| `wrfaorc_withObsScaled` | 1979-10-01 – 2021-12-31 | WRF-Hydro AORC-forced, obs-scaled |
-| `pub_nhmv10_BC_withObsScaled` | 1945-01-01 – 2023-12-31 | Long-record reconstruction dataset |
+Use `get_inflow_type_list()` for the complete and up-to-date list of available inflow
+types with their date ranges.
 
 `_withObsScaled` variants blend hydrologic model output with observed streamflow
 and are generally preferred for retrospective analysis.

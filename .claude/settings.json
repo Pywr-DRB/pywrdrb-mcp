@@ -7,7 +7,11 @@
       "mcp__pywrdrb-mcp__search_codebase",
       "mcp__pywrdrb-mcp__get_reservoir_details",
       "mcp__pywrdrb-mcp__get_module_overview",
-      "mcp__pywrdrb-mcp__get_model_builder_method"
+      "mcp__pywrdrb-mcp__get_model_builder_method",
+      "mcp__pywrdrb-mcp__get_node_list",
+      "mcp__pywrdrb-mcp__get_node_topology",
+      "mcp__pywrdrb-mcp__get_ffmp_data",
+      "mcp__pywrdrb-mcp__get_data_file_list"
     ]
   }
 }

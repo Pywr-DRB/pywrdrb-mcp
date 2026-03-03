@@ -1,4 +1,8 @@
-"""MCP prompt templates for guided Pywr-DRB workflows."""
+"""MCP prompt templates for guided Pywr-DRB workflows.
+
+All prompts use the 'how_to_*' naming convention to clearly indicate
+they are instructional guides, not actions.
+"""
 
 from __future__ import annotations
 
@@ -8,8 +12,8 @@ from pywrdrb_mcp.server import mcp
 
 
 @mcp.prompt()
-def add_new_parameter() -> list[Message]:
-    """Guide for adding a new custom Pywr Parameter to the Pywr-DRB model.
+def how_to_add_parameter() -> list[Message]:
+    """How to add a new custom Pywr Parameter to the Pywr-DRB model.
 
     Walks through the pattern: inherit from pywr.parameters.Parameter,
     implement required methods, and register with Pywr.
@@ -18,14 +22,14 @@ def add_new_parameter() -> list[Message]:
         Message(
             role="user",
             content=(
-                "I want to add a new custom parameter to Pywr-DRB. "
+                "How do I add a new custom parameter to Pywr-DRB? "
                 "Walk me through the implementation pattern."
             ),
         ),
         Message(
             role="assistant",
             content="""\
-# Adding a New Pywr Parameter to Pywr-DRB
+# How to Add a New Pywr Parameter
 
 ## Step 1: Create a new file or add to an existing module
 
@@ -106,17 +110,17 @@ Use the `get_parameter_class_info` tool to inspect any existing class for detail
 
 
 @mcp.prompt()
-def debug_simulation() -> list[Message]:
-    """Step-by-step guide for debugging a Pywr-DRB simulation that fails or produces unexpected results."""
+def how_to_debug_simulation() -> list[Message]:
+    """How to debug a Pywr-DRB simulation that fails or produces unexpected results."""
     return [
         Message(
             role="user",
-            content="My Pywr-DRB simulation is failing or producing unexpected results. Help me debug it.",
+            content="How do I debug a Pywr-DRB simulation that is failing or producing unexpected results?",
         ),
         Message(
             role="assistant",
             content="""\
-# Debugging a Pywr-DRB Simulation
+# How to Debug a Pywr-DRB Simulation
 
 ## Step 1: Check the model build
 
@@ -128,7 +132,7 @@ mb.write_model("debug_model.json")
 
 - Inspect the generated JSON for missing nodes or parameters
 - Check that `inflow_type` matches an available dataset (use `get_data_file_list` tool)
-- Verify date ranges match the inflow data (use `pywrdrb://data/inflow-types` resource)
+- Verify date ranges match the inflow data (use `get_inflow_type_list` tool)
 
 ## Step 2: Verify inflow data exists
 
@@ -172,8 +176,8 @@ Common date ranges:
 
 
 @mcp.prompt()
-def understand_node(node_name: str = "delMontague") -> list[Message]:
-    """Gather all information about a specific node in the river network.
+def how_to_understand_node(node_name: str = "delMontague") -> list[Message]:
+    """How to gather all information about a specific node in the river network.
 
     Args:
         node_name: The node to investigate (default: delMontague).
@@ -181,14 +185,14 @@ def understand_node(node_name: str = "delMontague") -> list[Message]:
     return [
         Message(
             role="user",
-            content=f"Help me understand everything about the node '{node_name}' in the Pywr-DRB model.",
+            content=f"How do I find out everything about the node '{node_name}' in the Pywr-DRB model?",
         ),
         Message(
             role="assistant",
             content=f"""\
-# Understanding Node: {node_name}
+# How to Understand Node: {node_name}
 
-I'll gather all available information about this node. Let me use the MCP tools:
+Use these MCP tools to build a complete picture of any node:
 
 ## 1. Network topology
 Use `get_node_topology("{node_name}", include_flood_topology=True)` to get:
@@ -216,25 +220,23 @@ Check what observation and model data is available:
 - If NYC reservoir: check FFMP rules (`pywrdrb://domain/ffmp-rules-summary`)
 - If STARFIT reservoir: check STARFIT rules (`pywrdrb://domain/starfit-rules-summary`)
 - If flood monitoring node: check flood operations (`pywrdrb://domain/flood-operations-summary`)
-
-Let me start by pulling the topology data for {node_name}.
 """,
         ),
     ]
 
 
 @mcp.prompt()
-def modify_ffmp_rules() -> list[Message]:
-    """Guide for modifying FFMP operational parameters using NYCOperationsConfig."""
+def how_to_modify_ffmp_rules() -> list[Message]:
+    """How to modify FFMP operational parameters using NYCOperationsConfig."""
     return [
         Message(
             role="user",
-            content="I want to modify the FFMP operational rules for a scenario. How do I do that?",
+            content="How do I modify the FFMP operational rules for a scenario?",
         ),
         Message(
             role="assistant",
             content="""\
-# Modifying FFMP Rules via NYCOperationsConfig
+# How to Modify FFMP Rules via NYCOperationsConfig
 
 The `NYCOperationsConfig` class (`parameters/nyc_operations_config.py`) centralizes all
 tunable FFMP parameters. You can modify rules **without editing core source code**.
@@ -301,28 +303,26 @@ mb = ModelBuilder(
 mb.make_model()
 ```
 
-## Step 4: Key methods to inspect
-Use `get_parameter_class_info("NYCOperationsConfig")` to see all available methods.
-
-The config object is validated internally — it will raise errors if values are
-out of acceptable ranges.
+## Step 4: Inspect available FFMP data
+- Use `get_ffmp_data` tool to see current profiles and coefficients
+- Use `get_parameter_class_info("NYCOperationsConfig")` for all methods
 """,
         ),
     ]
 
 
 @mcp.prompt()
-def add_inflow_source() -> list[Message]:
-    """Walkthrough for adding a new inflow data source to Pywr-DRB."""
+def how_to_add_inflow_source() -> list[Message]:
+    """How to add a new inflow data source to Pywr-DRB."""
     return [
         Message(
             role="user",
-            content="I want to add a new hydrologic model inflow source to Pywr-DRB.",
+            content="How do I add a new hydrologic model inflow source to Pywr-DRB?",
         ),
         Message(
             role="assistant",
             content="""\
-# Adding a New Inflow Source to Pywr-DRB
+# How to Add a New Inflow Source
 
 ## Overview
 Inflow data in Pywr-DRB comes from hydrologic models (NHM, NWM, WRF-Hydro) and observations.
@@ -355,7 +355,7 @@ my_source_site_matches = {
 If you need to transform raw model output, create a preprocessor in `pywrdrb/pre/flows.py`:
 - Inherit from the base preprocessor pattern
 - Implement flow disaggregation and scaling logic
-- See existing `NhmV10FlowPreprocessor` as a reference
+- See existing preprocessors via `get_module_overview("pre/flows.py")`
 
 ## Step 4: Register the date range
 
@@ -372,27 +372,27 @@ mb = ModelBuilder("start", "end", "your_inflow_type")
 mb.make_model()
 ```
 
-## Key files to inspect:
+## Key tools:
+- `get_inflow_type_list()` — See existing inflow types and date ranges
+- `get_data_file_list("flows")` — See existing inflow directories on disk
 - `get_module_overview("pre/flows.py")` — Existing preprocessors
-- `get_file_contents("pywr_drb_node_data.py")` — Site mapping dictionaries
-- `get_data_file_list("flows")` — See existing inflow directories
 """,
         ),
     ]
 
 
 @mcp.prompt()
-def review_model_output() -> list[Message]:
-    """Guide for loading and interpreting Pywr-DRB simulation results."""
+def how_to_review_output() -> list[Message]:
+    """How to load and interpret Pywr-DRB simulation results."""
     return [
         Message(
             role="user",
-            content="I've run a simulation. How do I load and interpret the results?",
+            content="How do I load and interpret Pywr-DRB simulation results?",
         ),
         Message(
             role="assistant",
             content="""\
-# Reviewing Pywr-DRB Simulation Output
+# How to Review Simulation Output
 
 ## Step 1: Load results with the Data class
 
@@ -430,7 +430,7 @@ obs_flows = data.major_flow["obs"]["obs"]
 
 ## Step 4: Available results_set options
 
-Use `pywrdrb://data/results-sets` resource for the full list. Key ones:
+Use `get_results_set_list()` tool for the full list. Key ones:
 - `major_flow` — Streamflow at key river points (MGD)
 - `res_storage` — Reservoir storage volumes (MG)
 - `res_release` — Reservoir releases (MGD)
@@ -439,8 +439,6 @@ Use `pywrdrb://data/results-sets` resource for the full list. Key ones:
 - `mrf_targets` — Montague/Trenton flow targets (MGD)
 - `res_level` — FFMP drought levels
 - `flood_stage` — Stage height at flood monitoring nodes (ft)
-- `temperature` — Water temperature data
-- `salinity` — Salt front location
 
 ## Step 5: Export for later use
 
@@ -453,7 +451,8 @@ data2.load_from_export("results_export.hdf5", results_sets=["major_flow"])
 ```
 
 ## Key tools:
-- `get_parameter_class_info("OutputRecorder")` — How results are saved
+- `get_results_set_list()` — All available results sets with descriptions
+- `get_data_object_info()` — Data class structure and storage hierarchy
 - `pywrdrb://api/data-loader-api` — Full Data class API
 """,
         ),
