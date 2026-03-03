@@ -174,16 +174,6 @@ All prompts use the `how_to_*` naming convention to indicate they are instructio
 | `how_to_add_inflow_source` | Add a new hydrologic model inflow dataset |
 | `how_to_review_output` | Load and interpret simulation results |
 
-### Examples
-
-See the `examples/` directory for usage guides:
-
-- `01_exploring_the_network.md` — Node topology, reservoir details, network graph
-- `02_working_with_parameters.md` — Listing, inspecting, and adding parameter classes
-- `03_ffmp_operations.md` — FFMP data queries, rules, and scenario modification
-- `04_simulation_results.md` — Data class, results sets, loading output
-- `05_building_models.md` — ModelBuilder options, inflow sources, debugging
-
 ## Architecture
 
 ```

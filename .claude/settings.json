@@ -11,7 +11,13 @@
       "mcp__pywrdrb-mcp__get_node_list",
       "mcp__pywrdrb-mcp__get_node_topology",
       "mcp__pywrdrb-mcp__get_ffmp_data",
-      "mcp__pywrdrb-mcp__get_data_file_list"
+      "mcp__pywrdrb-mcp__get_data_file_list",
+      "Bash(uv run python -c \"import fastmcp; print\\(fastmcp.__version__\\)\")",
+      "Bash(uv run python -c \"from fastmcp import FastMCP; m = FastMCP\\(''test''\\); import inspect; print\\(inspect.signature\\(m.run\\)\\)\")",
+      "Bash(uv run python -c \":*)",
+      "WebFetch(domain:gofastmcp.com)",
+      "WebFetch(domain:waterprogramming.wpcomstaging.com)",
+      "WebFetch(domain:waterprogramming.wordpress.com)"
     ]
   }
 }
