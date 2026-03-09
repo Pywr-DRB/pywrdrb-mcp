@@ -328,3 +328,44 @@ def _parse_attributes_section(docstring: str) -> dict[str, str]:
         descriptions[current_name] = " ".join(current_desc_lines).strip()
 
     return descriptions
+
+
+def extract_dict_from_simple_script(filepath: Path, variable_name: str) -> dict | None:
+    """Extract a dict built procedurally from a simple script (e.g., for-loops + assignments).
+
+    Unlike extract_module_level_dict, this handles scripts where a dict is built
+    incrementally (e.g., ``d = {}; d["key"] = val``). It first verifies via AST
+    that the file contains no imports or dangerous constructs, then executes the
+    pure-literal code in a restricted namespace.
+
+    Returns None if the file contains imports or the variable is not a dict.
+    """
+    source = filepath.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    # Safety check: reject files with imports, function calls to external modules,
+    # or any construct beyond assignments, for-loops, and literals
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            return None
+        # Allow: Assign, AugAssign, For, Expr (docstrings), Module, Constant,
+        #        Dict, List, Tuple, Name, Subscript, Index, BinOp, UnaryOp,
+        #        Compare, JoinedStr, FormattedValue, Call (only to builtins)
+        if isinstance(node, ast.Call):
+            # Only allow calls to known safe builtins
+            if isinstance(node.func, ast.Name) and node.func.id in (
+                "range", "len", "str", "int", "float", "list", "dict", "tuple", "set",
+            ):
+                continue
+            return None
+
+    namespace: dict[str, Any] = {}
+    try:
+        exec(compile(tree, str(filepath), "exec"), {"__builtins__": {}}, namespace)  # noqa: S102
+    except Exception:
+        return None
+
+    result = namespace.get(variable_name)
+    if isinstance(result, dict):
+        return result
+    return None

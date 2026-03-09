@@ -49,8 +49,16 @@ def get_node_topology(
     if node_name in index.storage_gauge_map:
         result["storage_gauge"] = index.storage_gauge_map[node_name]
 
-    if include_flood_topology and node_name in index.flood_stage_thresholds:
-        result["flood_thresholds"] = index.flood_stage_thresholds[node_name]
+    if include_flood_topology:
+        if node_name in index.flood_stage_thresholds:
+            result["flood_thresholds"] = index.flood_stage_thresholds[node_name]
+        # Include rating curve metadata if available for this node's gage
+        gage_ids = result.get("gage_ids", {})
+        obs_ids = gage_ids.get("usgs_obs") or []
+        for site_no in obs_ids:
+            if site_no in index.rating_curve_metadata:
+                result["rating_curve"] = index.rating_curve_metadata[site_no]
+                break
 
     is_flood_node = node_name in index.flood_monitoring_nodes
     result["is_flood_monitoring_node"] = is_flood_node
@@ -97,6 +105,8 @@ def get_reservoir_details(reservoir_name: str) -> str:
         "reservoir": reservoir_name,
         "type": res_type,
         "classifications": classifications,
+        "capacity_mg": index.reservoir_capacities.get(reservoir_name),
+        "mean_flow_mgd": index.reservoir_mean_flows.get(reservoir_name),
         "downstream_node": index.immediate_downstream.get(reservoir_name),
         "downstream_lag_days": index.downstream_lags.get(reservoir_name),
         "downstream_gage": index.reservoir_link_pairs.get(reservoir_name),
@@ -110,6 +120,9 @@ def get_reservoir_details(reservoir_name: str) -> str:
         },
         "upstream_nodes": index.upstream_nodes.get(reservoir_name, []),
     }
+
+    if reservoir_name in index.reservoir_starfit_params:
+        result["starfit_params"] = index.reservoir_starfit_params[reservoir_name]
 
     if reservoir_name in index.flood_stage_thresholds:
         result["flood_thresholds"] = index.flood_stage_thresholds[reservoir_name]

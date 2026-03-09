@@ -1,4 +1,4 @@
-"""Tools for querying operational constants, data files, repo status, and refreshing the index."""
+"""Tools for querying data files, repo status, and refreshing the index."""
 
 from __future__ import annotations
 
@@ -6,17 +6,8 @@ import json
 import subprocess
 
 from pywrdrb_mcp.server import mcp, index
-from pywrdrb_mcp.config import PYWRDRB_ROOT, PYWRDRB_REPO_ROOT
+from pywrdrb_mcp.config import PYWRDRB_REPO_ROOT
 from pywrdrb_mcp.index.file_utils import get_data_directory_listing
-
-
-@mcp.tool()
-def get_operational_constants() -> str:
-    """Get unit conversion constants and key operational values used by Pywr-DRB.
-
-    Returns all constants from utils/constants.py (e.g., cfs_to_mgd, cms_to_mgd).
-    """
-    return json.dumps(index.constants, indent=2)
 
 
 @mcp.tool()

@@ -9,6 +9,28 @@ from pywrdrb_mcp.config import PYWRDRB_ROOT
 from pywrdrb_mcp.index.ast_utils import extract_class_info
 
 
+def _extract_loader_methods(rel_path: str, class_name: str) -> list[dict]:
+    """Extract public method info from a loader class."""
+    filepath = PYWRDRB_ROOT / rel_path
+    if not filepath.exists():
+        return []
+    try:
+        classes = extract_class_info(filepath, class_name=class_name)
+        if not classes:
+            return []
+        methods = []
+        for m in classes[0]["methods"]:
+            if m["name"].startswith("_") and m["name"] != "__init__":
+                continue
+            doc = m["docstring"]
+            first = doc.strip().split("\n")[0] if doc else "(no description)"
+            args = [a["name"] for a in m["args"] if a["name"] != "self"]
+            methods.append({"name": m["name"], "args": args, "description": first})
+        return methods
+    except Exception:
+        return []
+
+
 @mcp.tool()
 def get_data_object_info() -> str:
     """Get the structure of the pywrdrb Data object and how simulation results are stored.
@@ -16,19 +38,17 @@ def get_data_object_info() -> str:
     Returns the Data class hierarchy, available loading methods, results_set
     options per loader, and the storage access pattern.
     """
-    # Get Data class methods via AST
-    filepath = PYWRDRB_ROOT / "load" / "data_loader.py"
-    methods_info = []
-    try:
-        classes = extract_class_info(filepath, class_name="Data")
-        if classes:
-            for m in classes[0]["methods"]:
-                if not m["name"].startswith("_"):
-                    doc = m["docstring"]
-                    first = doc.strip().split("\n")[0] if doc else "(no description)"
-                    methods_info.append({"name": m["name"], "description": first})
-    except Exception:
-        pass
+    # Dynamically extract methods from each loader class
+    loader_hierarchy = {}
+    for rel_path, cls_name in [
+        ("load/data_loader.py", "Data"),
+        ("load/output_loader.py", "Output"),
+        ("load/observation_loader.py", "Observation"),
+        ("load/hydrologic_model_loader.py", "HydrologicModelFlow"),
+    ]:
+        methods = _extract_loader_methods(rel_path, cls_name)
+        if methods:
+            loader_hierarchy[cls_name] = {"file": rel_path, "methods": methods}
 
     result = {
         "overview": (
@@ -36,6 +56,7 @@ def get_data_object_info() -> str:
             "simulation output, and hydrologic model data. All data is stored as "
             "pandas DataFrames organized by results_set, data source label, and scenario index."
         ),
+        "class_hierarchy": "AbstractDataLoader → Output, Observation, HydrologicModelFlow → Data",
         "access_pattern": {
             "syntax": "data.{results_set}['{source_label}'][scenario_id]",
             "example": 'data.major_flow["drb_output_nhmv10"][0]',
@@ -54,10 +75,8 @@ def get_data_object_info() -> str:
             "load_observations()": {
                 "description": "Load USGS observation data",
                 "valid_results_sets": [
-                    "major_flow",
-                    "reservoir_downstream_gage",
-                    "res_storage",
-                    "flood_gage_flow",
+                    "major_flow", "reservoir_downstream_gage",
+                    "res_storage", "flood_gage_flow",
                 ],
             },
             "load_hydrologic_model_flow()": {
@@ -84,7 +103,7 @@ def get_data_object_info() -> str:
             },
             "note": "The results_set abstraction maps these raw keys to cleaner node-name columns",
         },
-        "methods": methods_info,
+        "loader_classes": loader_hierarchy,
     }
 
     return json.dumps(result, indent=2)

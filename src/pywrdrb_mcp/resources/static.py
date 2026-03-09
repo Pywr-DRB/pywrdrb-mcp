@@ -42,7 +42,7 @@ def network_graph() -> str:
 
 @mcp.resource("pywrdrb://topology/reservoir-list")
 def reservoir_list_resource() -> str:
-    """All 17 reservoirs with type classification (NYC / STARFIT / Lower Basin)."""
+    """All 17 reservoirs with type classification, downstream connectivity, and gage info."""
     reservoirs = []
     for r in index.reservoir_list:
         rtype = "NYC" if r in index.reservoir_list_nyc else "STARFIT"
@@ -54,17 +54,39 @@ def reservoir_list_resource() -> str:
             "is_nyc": r in index.reservoir_list_nyc,
             "is_starfit": r in index.starfit_reservoir_list,
             "is_lower_basin": r in index.drbc_lower_basin_reservoirs,
+            "is_independent_starfit": r in index.independent_starfit_reservoirs,
+            "capacity_mg": index.reservoir_capacities.get(r),
+            "downstream_node": index.immediate_downstream.get(r),
+            "downstream_gage": index.reservoir_link_pairs.get(r),
         })
-    return json.dumps(reservoirs, indent=2)
+    return json.dumps({
+        "reservoirs": reservoirs,
+        "counts": {
+            "total": len(index.reservoir_list),
+            "nyc": len(index.reservoir_list_nyc),
+            "starfit": len(index.starfit_reservoir_list),
+            "lower_basin": len(index.drbc_lower_basin_reservoirs),
+        },
+    }, indent=2)
 
 
 @mcp.resource("pywrdrb://topology/node-list")
 def node_list_resource() -> str:
-    """Major flow nodes and flood monitoring nodes."""
+    """All nodes in the Pywr-DRB river network, organized by type."""
     return json.dumps({
+        "reservoir_nodes": {
+            "nyc": index.reservoir_list_nyc,
+            "starfit": index.starfit_reservoir_list,
+            "lower_basin": index.drbc_lower_basin_reservoirs,
+        },
         "major_flow_nodes": index.majorflow_list,
-        "flood_monitoring_nodes": index.flood_monitoring_nodes,
+        "flood_monitoring_nodes": [
+            {"id": "01426500", "name": "Hale Eddy", "downstream_of": "cannonsville"},
+            {"id": "01421000", "name": "Fishs Eddy", "downstream_of": "pepacton"},
+            {"id": "01436690", "name": "Bridgeville", "downstream_of": "neversink"},
+        ],
         "all_nodes": index.all_node_names,
+        "total_count": len(index.all_node_names),
     }, indent=2)
 
 
@@ -111,44 +133,194 @@ def model_builder_api() -> str:
 
 @mcp.resource("pywrdrb://api/data-loader-api")
 def data_loader_api() -> str:
-    """Data class methods and results_set options."""
+    """Data class hierarchy, methods, and results_set options."""
     from pywrdrb_mcp.index.ast_utils import extract_class_info
-
-    filepath = PYWRDRB_ROOT / "load" / "data_loader.py"
-    classes = extract_class_info(filepath, class_name="Data")
 
     lines = ["# Data Loader API\n"]
 
-    if classes:
+    # Show the loader hierarchy
+    loader_files = [
+        ("load/abstract_loader.py", "AbstractDataLoader"),
+        ("load/output_loader.py", "Output"),
+        ("load/observation_loader.py", "Observation"),
+        ("load/hydrologic_model_loader.py", "HydrologicModelFlow"),
+        ("load/data_loader.py", "Data"),
+    ]
+
+    for rel_path, cls_name in loader_files:
+        filepath = PYWRDRB_ROOT / rel_path
+        if not filepath.exists():
+            continue
+        classes = extract_class_info(filepath, class_name=cls_name)
+        if not classes:
+            continue
         cls = classes[0]
-        lines.append(f"**Docstring:** {(cls['docstring'] or '').strip().split(chr(10))[0]}\n")
-        lines.append("## Methods\n")
+        bases = ", ".join(cls["bases"]) if cls["bases"] else ""
+        doc_first = (cls["docstring"] or "").strip().split("\n")[0]
+        lines.append(f"## {cls_name}({bases})")
+        if doc_first:
+            lines.append(f"_{doc_first}_\n")
         for m in cls["methods"]:
-            if m["name"].startswith("__") and m["name"] != "__init__":
+            if m["name"].startswith("_") and m["name"] != "__init__":
                 continue
             doc = m["docstring"]
             first = doc.strip().split("\n")[0] if doc else "(no description)"
             lines.append(f"- **{m['name']}()** — {first}")
+        lines.append("")
 
-    lines.append("\n## Results Set Options\n")
+    lines.append("## Results Set Options\n")
     lines.append("| results_set | Description |")
     lines.append("|---|---|")
     for rs, desc in index.results_set_descriptions.items():
         lines.append(f"| `{rs}` | {desc} |")
+
+    lines.append("\n## Valid Results Sets by Loader\n")
+    lines.append("- **load_output()**: All results_sets")
+    lines.append("- **load_observations()**: major_flow, reservoir_downstream_gage, res_storage, flood_gage_flow")
+    lines.append("- **load_hydrologic_model_flow()**: all, major_flow, reservoir_downstream_gage")
+
+    return "\n".join(lines)
+
+
+@mcp.resource("pywrdrb://api/post-processing-api")
+def post_processing_api() -> str:
+    """Post-processing function signatures from metrics.py and calculate_error_metrics.py."""
+    from pywrdrb_mcp.index.ast_utils import extract_function_info
+
+    lines = ["# Post-Processing API\n"]
+
+    for rel_path, label in [
+        ("post/metrics.py", "Performance Metrics"),
+        ("post/calculate_error_metrics.py", "Error Metrics"),
+    ]:
+        filepath = PYWRDRB_ROOT / rel_path
+        if not filepath.exists():
+            continue
+        functions = extract_function_info(filepath)
+        if not functions:
+            continue
+        lines.append(f"## {label} (`{rel_path}`)\n")
+        for fn in functions:
+            doc = fn["docstring"]
+            first = doc.strip().split("\n")[0] if doc else "(no description)"
+            args = ", ".join(a["name"] for a in fn["args"])
+            lines.append(f"- **{fn['name']}**({args}) — {first}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+@mcp.resource("pywrdrb://api/preprocessing-api")
+def preprocessing_api() -> str:
+    """Preprocessing class and function signatures from pre/ modules."""
+    from pywrdrb_mcp.index.ast_utils import extract_class_info, extract_function_info
+
+    lines = ["# Preprocessing API\n"]
+
+    modules = [
+        ("pre/predict_inflows.py", "Inflow Prediction"),
+        ("pre/predict_timeseries.py", "Base Prediction"),
+        ("pre/flows.py", "Flow Preprocessing"),
+        ("pre/predict_diversions.py", "Diversion Prediction"),
+        ("pre/obs_data_retrieval.py", "Observation Data Retrieval"),
+    ]
+
+    for rel_path, label in modules:
+        filepath = PYWRDRB_ROOT / rel_path
+        if not filepath.exists():
+            continue
+
+        lines.append(f"## {label} (`{rel_path}`)\n")
+
+        classes = extract_class_info(filepath)
+        for cls in classes:
+            bases = ", ".join(cls["bases"]) if cls["bases"] else ""
+            doc_first = (cls["docstring"] or "").strip().split("\n")[0]
+            lines.append(f"### {cls['name']}({bases})")
+            if doc_first:
+                lines.append(f"_{doc_first}_\n")
+            for m in cls["methods"]:
+                if m["name"].startswith("_") and m["name"] != "__init__":
+                    continue
+                doc = m["docstring"]
+                first = doc.strip().split("\n")[0] if doc else "(no description)"
+                lines.append(f"- **{m['name']}()** — {first}")
+            lines.append("")
+
+        functions = extract_function_info(filepath)
+        for fn in functions:
+            doc = fn["docstring"]
+            first = doc.strip().split("\n")[0] if doc else "(no description)"
+            lines.append(f"- **{fn['name']}()** — {first}")
+        if functions:
+            lines.append("")
+
+    return "\n".join(lines)
+
+
+@mcp.resource("pywrdrb://api/nyc-operations-config")
+def nyc_operations_config_api() -> str:
+    """NYCOperationsConfig class structure and methods for modifying FFMP rules."""
+    from pywrdrb_mcp.index.ast_utils import extract_class_info
+
+    filepath = PYWRDRB_ROOT / "parameters" / "nyc_operations_config.py"
+    classes = extract_class_info(filepath, class_name="NYCOperationsConfig")
+
+    if not classes:
+        return "Could not parse NYCOperationsConfig class."
+
+    cls = classes[0]
+    lines = [
+        "# NYCOperationsConfig API\n",
+        f"_{(cls['docstring'] or '').strip().split(chr(10))[0]}_\n",
+        "## Methods\n",
+    ]
+
+    for m in cls["methods"]:
+        if m["name"].startswith("_") and m["name"] != "__init__":
+            continue
+        doc = m["docstring"]
+        first = doc.strip().split("\n")[0] if doc else "(no description)"
+        args = ", ".join(
+            f"{a['name']}: {a.get('annotation', '')}" if a.get("annotation") else a["name"]
+            for a in m["args"]
+            if a["name"] != "self"
+        )
+        lines.append(f"- **{m['name']}**({args}) — {first}")
 
     return "\n".join(lines)
 
 
 @mcp.resource("pywrdrb://data/inflow-types")
 def inflow_types() -> str:
-    """Available inflow types with date ranges."""
-    return json.dumps(index.model_date_ranges, indent=2)
+    """Available inflow types with date ranges and usage guidance."""
+    inflows = []
+    for name, (start, end) in sorted(index.model_date_ranges.items()):
+        inflows.append({
+            "inflow_type": name,
+            "start_date": start,
+            "end_date": end,
+        })
+    return json.dumps({
+        "inflow_types": inflows,
+        "total_count": len(inflows),
+        "usage": "Pass as inflow_type to ModelBuilder(start, end, inflow_type)",
+    }, indent=2)
 
 
 @mcp.resource("pywrdrb://data/results-sets")
 def results_sets() -> str:
-    """All results_set options with descriptions."""
-    return json.dumps(index.results_set_descriptions, indent=2)
+    """All results_set options with descriptions and valid data sources per loader."""
+    return json.dumps({
+        "results_sets": index.results_set_descriptions,
+        "total_count": len(index.results_set_descriptions),
+        "valid_by_loader": {
+            "load_output": "All results_sets listed above",
+            "load_observations": ["major_flow", "reservoir_downstream_gage", "res_storage", "flood_gage_flow"],
+            "load_hydrologic_model_flow": ["all", "major_flow", "reservoir_downstream_gage"],
+        },
+        "usage": "Pass as results_sets=['major_flow', 'res_storage'] to Data()",
+    }, indent=2)
 
 
 @mcp.resource("pywrdrb://domain/constants")
@@ -200,6 +372,23 @@ def reservoir_resource(reservoir_name: str) -> str:
 # ═══════════════════════════════════════════════════════════════════════
 
 
+@mcp.resource("pywrdrb://domain/rating-curves")
+def rating_curves_resource() -> str:
+    """USGS rating curve metadata for flood monitoring gages (stage-discharge conversion)."""
+    # Map site numbers to node names for context
+    site_to_node = {
+        "01426500": "cannonsville (Hale Eddy)",
+        "01421000": "pepacton (Fishs Eddy)",
+        "01436690": "neversink (Bridgeville)",
+    }
+    result = {}
+    for site_no, meta in index.rating_curve_metadata.items():
+        entry = dict(meta)
+        entry["downstream_of_reservoir"] = site_to_node.get(site_no, "unknown")
+        result[site_no] = entry
+    return json.dumps(result, indent=2)
+
+
 @mcp.resource("pywrdrb://domain/ffmp-rules-summary")
 def ffmp_rules() -> str:
     """Comprehensive FFMP rules: drought levels, storage zones, MRF targets, delivery constraints."""
@@ -216,6 +405,24 @@ def starfit_rules() -> str:
 def flood_operations() -> str:
     """Flood monitoring stages, rating curves, thresholds, and flood-responsive operations."""
     return _read_content("flood_operations.md")
+
+
+@mcp.resource("pywrdrb://domain/post-processing-guide")
+def post_processing_guide() -> str:
+    """Performance metrics, shortfall analysis, and error metrics guide."""
+    return _read_content("post_processing.md")
+
+
+@mcp.resource("pywrdrb://domain/preprocessing-guide")
+def preprocessing_guide() -> str:
+    """Inflow prediction, flow preprocessing, and data retrieval guide."""
+    return _read_content("preprocessing.md")
+
+
+@mcp.resource("pywrdrb://domain/data-loading-guide")
+def data_loading_guide() -> str:
+    """Data loading patterns, results_set descriptions, and HDF5 conventions."""
+    return _read_content("data_loading.md")
 
 
 @mcp.resource("pywrdrb://project/getting-started")

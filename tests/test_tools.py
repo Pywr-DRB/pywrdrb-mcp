@@ -13,7 +13,6 @@ from pywrdrb_mcp.tools.code import get_file_contents, search_codebase, get_modul
 from pywrdrb_mcp.tools.parameters import get_parameter_class_info
 from pywrdrb_mcp.tools.model_builder import get_model_builder_options, get_model_builder_method
 from pywrdrb_mcp.tools.data import (
-    get_operational_constants,
     get_repo_status,
     get_data_file_list,
     refresh_index,
@@ -53,6 +52,17 @@ class TestTopologyTools:
     def test_get_reservoir_details_unknown(self):
         result = json.loads(get_reservoir_details("nonexistent"))
         assert "error" in result
+
+    def test_get_reservoir_details_has_capacity(self):
+        result = json.loads(get_reservoir_details("cannonsville"))
+        assert "capacity_mg" in result
+        assert result["capacity_mg"] is not None
+        assert result["capacity_mg"] > 0
+
+    def test_get_reservoir_details_starfit_params(self):
+        result = json.loads(get_reservoir_details("cannonsville"))
+        assert "starfit_params" in result
+        assert "Release_c" in result["starfit_params"]
 
 
 class TestCodeTools:
@@ -108,11 +118,6 @@ class TestModelBuilderTools:
 
 
 class TestDataTools:
-    def test_get_operational_constants(self):
-        result = json.loads(get_operational_constants())
-        assert "cfs_to_mgd" in result
-        assert isinstance(result["cfs_to_mgd"], float)
-
     def test_get_repo_status(self):
         result = json.loads(get_repo_status())
         assert "branch" in result or "branch_error" in result

@@ -5,6 +5,7 @@ Built once when the MCP server starts; tools and resources read from it.
 
 from __future__ import annotations
 
+import csv
 import logging
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from pywrdrb_mcp.config import PYWRDRB_ROOT
 from pywrdrb_mcp.index.ast_utils import (
     extract_class_info,
     extract_dataclass_fields,
+    extract_dict_from_simple_script,
     extract_module_level_dict,
     extract_module_level_list,
     extract_module_level_value,
@@ -38,6 +40,8 @@ class PywrDRBIndex:
         self._build_parameter_index()
         self._build_results_sets()
         self._build_date_ranges()
+        self._build_reservoir_data()
+        self._build_rating_curves()
         self._build_package_structure()
 
     def rebuild(self) -> dict:
@@ -176,16 +180,125 @@ class PywrDRBIndex:
     # ── Date Ranges ───────────────────────────────────────────────────
 
     def _build_date_ranges(self) -> None:
-        """Hard-coded date ranges (the source builds them procedurally)."""
-        self.model_date_ranges: dict[str, tuple[str, str]] = {}
-        for nxm in ["nhmv10", "nwmv21"]:
-            self.model_date_ranges[nxm] = ("1983-10-01", "2016-12-31")
-            self.model_date_ranges[f"{nxm}_withObsScaled"] = ("1983-10-01", "2016-12-31")
-        self.model_date_ranges["wrf1960s_calib_nlcd2016"] = ("1959-10-01", "1969-12-31")
-        self.model_date_ranges["wrf2050s_calib_nlcd2016"] = ("1959-10-01", "1969-12-31")
-        self.model_date_ranges["wrfaorc_calib_nlcd2016"] = ("1979-10-01", "2021-12-31")
-        self.model_date_ranges["wrfaorc_withObsScaled"] = ("1979-10-01", "2021-12-31")
-        self.model_date_ranges["pub_nhmv10_BC_withObsScaled"] = ("1945-01-01", "2023-12-31")
+        """Extract date ranges from utils/dates.py (built procedurally in source)."""
+        dates_file = PYWRDRB_ROOT / "utils" / "dates.py"
+        extracted = extract_dict_from_simple_script(dates_file, "model_date_ranges")
+        if extracted:
+            self.model_date_ranges = extracted
+        else:
+            log.warning("Could not extract model_date_ranges from dates.py, using fallback")
+            self.model_date_ranges = {}
+
+        # Also extract temperature prediction date range
+        temp_range = extract_dict_from_simple_script(dates_file, "temp_pred_date_range")
+        if isinstance(temp_range, tuple):
+            self.temp_pred_date_range = temp_range
+        else:
+            # Try extracting as a module-level value
+            val = extract_module_level_value(dates_file, "temp_pred_date_range")
+            self.temp_pred_date_range = val if val is not _MISSING else None
+
+    # ── Reservoir Data (from istarf CSV) ────────────────────────────
+
+    def _build_reservoir_data(self) -> None:
+        """Read reservoir capacity and STARFIT parameters from istarf_conus.csv."""
+        istarf_path = PYWRDRB_ROOT / "data" / "operational_constants" / "istarf_conus.csv"
+        self.reservoir_capacities: dict[str, float] = {}
+        self.reservoir_mean_flows: dict[str, float] = {}
+        self.reservoir_starfit_params: dict[str, dict] = {}
+
+        if not istarf_path.exists():
+            log.warning("istarf_conus.csv not found at %s", istarf_path)
+            return
+
+        try:
+            with open(istarf_path, encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    name = row.get("reservoir", "").strip()
+                    if not name:
+                        continue
+
+                    # Capacity and mean flow
+                    try:
+                        self.reservoir_capacities[name] = float(row["Adjusted_CAP_MG"])
+                    except (KeyError, ValueError):
+                        pass
+                    try:
+                        self.reservoir_mean_flows[name] = float(row["Adjusted_MEANFLOW_MGD"])
+                    except (KeyError, ValueError):
+                        pass
+
+                    # STARFIT harmonic coefficients
+                    starfit_keys = [
+                        "NORhi_alpha", "NORhi_beta", "NORhi_max", "NORhi_min", "NORhi_mu",
+                        "NORlo_alpha", "NORlo_beta", "NORlo_max", "NORlo_min", "NORlo_mu",
+                        "Release_alpha1", "Release_alpha2", "Release_beta1", "Release_beta2",
+                        "Release_c", "Release_max", "Release_min", "Release_p1", "Release_p2",
+                    ]
+                    params = {}
+                    for key in starfit_keys:
+                        if key in row and row[key]:
+                            try:
+                                val = float(row[key])
+                                # Skip sentinel values
+                                if val not in (-99999, float("inf"), float("-inf")):
+                                    params[key] = val
+                            except ValueError:
+                                pass
+                    if params:
+                        self.reservoir_starfit_params[name] = params
+        except Exception as e:
+            log.warning("Failed to read istarf_conus.csv: %s", e)
+
+    # ── Rating Curves ────────────────────────────────────────────────
+
+    def _build_rating_curves(self) -> None:
+        """Parse USGS NWIS rating curve headers for flood monitoring gages."""
+        rating_dir = PYWRDRB_ROOT / "data" / "rating_curves"
+        self.rating_curve_metadata: dict[str, dict] = {}
+
+        if not rating_dir.exists():
+            return
+
+        for txt_file in sorted(rating_dir.glob("*.txt")):
+            site_no = txt_file.stem
+            metadata: dict = {"site_number": site_no, "file": f"data/rating_curves/{txt_file.name}"}
+
+            try:
+                with open(txt_file, encoding="utf-8") as f:
+                    stages = []
+                    discharges = []
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith("#"):
+                            # Parse header comments
+                            if "STATION NAME=" in line:
+                                metadata["station_name"] = line.split("STATION NAME=")[1].strip().strip('"')
+                            elif "RATING EXPANSION=" in line:
+                                metadata["expansion"] = line.split("RATING EXPANSION=")[1].strip().strip('"')
+                            elif 'RATING_INDEP' in line and 'PARAMETER=' in line:
+                                metadata["stage_units"] = line.split('PARAMETER=')[1].strip().strip('"')
+                            elif 'RATING_DEP' in line and 'PARAMETER=' in line:
+                                metadata["discharge_units"] = line.split('PARAMETER=')[1].strip().strip('"')
+                            continue
+                        # Data rows: INDEP  SHIFT  DEP  STOR
+                        parts = line.split("\t")
+                        if len(parts) >= 3:
+                            try:
+                                stages.append(float(parts[0]))
+                                discharges.append(float(parts[2]))
+                            except ValueError:
+                                continue
+
+                    if stages:
+                        metadata["stage_range"] = {"min": min(stages), "max": max(stages)}
+                        metadata["discharge_range"] = {"min": min(discharges), "max": max(discharges)}
+                        metadata["num_points"] = len(stages)
+
+                self.rating_curve_metadata[site_no] = metadata
+            except Exception as e:
+                log.warning("Failed to parse rating curve %s: %s", txt_file.name, e)
 
     # ── Package Structure ─────────────────────────────────────────────
 

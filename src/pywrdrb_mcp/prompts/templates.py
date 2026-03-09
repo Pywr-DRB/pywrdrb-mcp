@@ -241,49 +241,68 @@ def how_to_modify_ffmp_rules() -> list[Message]:
 The `NYCOperationsConfig` class (`parameters/nyc_operations_config.py`) centralizes all
 tunable FFMP parameters. You can modify rules **without editing core source code**.
 
+Class constants:
+- `RESERVOIRS = ['cannonsville', 'pepacton', 'neversink']`
+- `STORAGE_LEVELS = ['level1b', 'level1c', 'level2', 'level3', 'level4', 'level5']`
+- `DROUGHT_LEVELS = ['level1a', 'level1b', 'level1c', 'level2', 'level3', 'level4', 'level5']`
+
 ## Step 1: Create a custom config
 
 ```python
 from pywrdrb.parameters.nyc_operations_config import NYCOperationsConfig
 
-# Start from defaults
-config = NYCOperationsConfig.from_defaults()
+config = NYCOperationsConfig.from_defaults()  # Loads from default CSV files
 ```
 
 ## Step 2: Modify specific rule categories
 
 ### Storage zones (drought level boundaries)
 ```python
+import numpy as np
 config.update_storage_zones(
-    level="L1b",                # Drought level to modify
-    profile_type="monthly",     # "daily", "weekly", or "monthly"
-    values=[...],               # New boundary values (12 monthly or 365 daily)
+    level="level2",                  # One of STORAGE_LEVELS
+    daily_values=np.array([...]),    # 366 daily threshold values (fraction 0-1)
 )
 ```
 
-### MRF targets (Montague/Trenton minimum flows)
+### MRF release factors (per reservoir and drought level)
 ```python
 config.update_mrf_factors(
-    target="montague",          # "montague" or "trenton"
-    level="L1a",                # Drought level
-    factor=0.85,                # Multiplier on base MRF
+    reservoir="cannonsville",        # One of RESERVOIRS
+    level="level2",                  # One of DROUGHT_LEVELS
+    daily_factors=np.array([...]),   # 366 daily factor values
+)
+# Or update monthly downstream flow factors:
+config.update_mrf_factors(
+    monthly_factors=np.array([...]), # 12 monthly factor values
+)
+```
+
+### MRF baselines (target flows at key nodes)
+```python
+config.update_mrf_baselines(
+    montague=1131.0,     # MGD baseline at Montague
+    trenton=1939.0,      # MGD baseline at Trenton
+    cannonsville=None,   # MGD per-reservoir baseline (optional)
 )
 ```
 
 ### Delivery constraints (NYC/NJ diversion limits)
 ```python
 config.update_delivery_constraints(
-    entity="nyc",               # "nyc" or "nj"
-    level="L1a",                # Drought level
-    running_avg_limit=800.0,    # MGD running average limit
+    max_nyc_delivery=800.0,                        # MGD baseline
+    max_nj_daily=100.0,                            # MGD daily
+    drought_factors_nyc=np.array([1,1,1,1,.85,.7,.65]),  # 7 levels (1a-5)
+    drought_factors_nj=np.array([1,1,1,1,1,.9,.8]),      # 7 levels (1a-5)
 )
 ```
 
 ### Flood release limits
 ```python
 config.update_flood_limits(
-    reservoir="cannonsville",
-    max_release=2000.0,         # MGD
+    max_release_cannonsville=4200.0,  # CFS
+    max_release_pepacton=2400.0,      # CFS
+    max_release_neversink=3400.0,     # CFS
 )
 ```
 
@@ -303,9 +322,18 @@ mb = ModelBuilder(
 mb.make_model()
 ```
 
-## Step 4: Inspect available FFMP data
-- Use `get_ffmp_data` tool to see current profiles and coefficients
-- Use `get_parameter_class_info("NYCOperationsConfig")` for all methods
+## Step 4: Export/inspect configuration
+```python
+config.to_csv("custom_ops_config/")   # Export to CSV files
+config2 = config.copy()               # Deep copy for sensitivity analysis
+profile = config.get_storage_zone_profile("level2")  # 366-day array
+factor = config.get_mrf_factor_profile("level2_factor_mrf_cannonsville")  # 366-day array
+```
+
+## Useful MCP resources
+- `pywrdrb://api/nyc-operations-config` — Full class API with method signatures
+- `pywrdrb://domain/ffmp-rules-summary` — FFMP operational rules explanation
+- `get_ffmp_data` tool — Query current operational constants and profiles
 """,
         ),
     ]

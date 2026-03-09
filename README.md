@@ -95,24 +95,7 @@ Edit the Claude Desktop config file:
 }
 ```
 
-> **Windows paths:** Use forward slashes (`C:/Users/...`) or escaped backslashes (`C:\\Users\\...`) in the JSON. Example:
-> ```json
-> {
->   "mcpServers": {
->     "pywrdrb-mcp": {
->       "command": "uv",
->       "args": [
->         "run",
->         "--directory", "C:/Users/you/pywrdrb-mcp",
->         "python", "-m", "pywrdrb_mcp.server"
->       ],
->       "env": {
->         "PYWRDRB_ROOT": "C:/Users/you/Pywr-DRB/src/pywrdrb"
->       }
->     }
->   }
-> }
-> ```
+> **Windows paths:** Use forward slashes (`C:/Users/...`) or escaped backslashes (`C:\\Users\\...`) in the JSON.
 
 After saving, **fully quit and restart** Claude Desktop (system tray > Exit, not just close the window).
 
@@ -120,46 +103,78 @@ After saving, **fully quit and restart** Claude Desktop (system tray > Exit, not
 
 | Feature | Support | Notes |
 |---|---|---|
-| **Tools** (19) | Full | All tools work. A hammer icon appears when tools are available. |
-| **Resources** (15) | Partial | Resources are listed under Settings > Integrations, but Claude Desktop does **not** proactively read them. Users must manually attach resources to a message via the `+` menu or `@` mention. |
+| **Tools** (14) | Full | All tools work. A hammer icon appears when tools are available. |
+| **Resources** (22) | Partial | Resources are listed under Settings > Integrations, but Claude Desktop does **not** proactively read them. Users must manually attach resources to a message via the `+` menu or `@` mention. |
 | **Prompts** (6) | Full | Prompts appear in the `+` menu. Prompts with arguments (e.g., `how_to_understand_node`) will prompt for input. |
 
 In practice, this means the **tools are the primary interface** on Claude Desktop. The domain knowledge resources (FFMP rules, STARFIT rules, flood operations) and the `how_to_*` prompts work but require manual user action to invoke. In Claude Code, resources and prompts are more seamlessly integrated.
 
 ## What's Included
 
-### Tools (19)
+### Tools (14)
 
 | Tool | Module | Purpose |
 |---|---|---|
-| `get_node_topology` | topology | River network connections, lags, and gage IDs for a node |
-| `get_reservoir_details` | topology | Reservoir type, classification, and data source mappings |
+| `get_node_topology` | topology | River network connections, lags, gage IDs, and rating curves for a node |
+| `get_reservoir_details` | topology | Reservoir type, capacity, STARFIT params, and data source mappings |
 | `get_file_contents` | code | Read any file in the pywrdrb source tree |
 | `search_codebase` | code | Regex search across all source files |
 | `get_module_overview` | code | Module docstring, classes, and functions summary |
 | `get_parameter_class_info` | parameters | Full class details (methods, signatures, docstrings) |
 | `get_model_builder_options` | model_builder | Options dataclass fields with types and defaults |
 | `get_model_builder_method` | model_builder | Source code for any ModelBuilder method |
-| `get_operational_constants` | data | Unit conversion constants |
 | `get_repo_status` | data | Git branch, recent commits, modified files |
 | `get_data_file_list` | data | Enumerate data files on disk |
 | `refresh_index` | data | Rebuild the cached index without restarting |
-| `get_node_list` | lists | All nodes by type (NYC, STARFIT, flood, etc.) |
-| `get_reservoir_list` | lists | All 17 reservoirs with type classifications |
 | `get_parameter_list` | lists | All parameter classes grouped by module |
-| `get_results_set_list` | lists | Available results set options for loading output |
-| `get_inflow_type_list` | lists | Available inflow data types with date ranges |
 | `get_data_object_info` | data_object | Data class hierarchy, access patterns, loading methods |
 | `get_ffmp_data` | ffmp_data | FFMP operational constants, profiles, and lower basin policy |
 
-### Resources (15)
+### Resources (22)
 
-- **Topology:** network graph, reservoir list, node list
-- **API:** parameter class index, ModelBuilder methods, Data loader methods
-- **Data:** inflow types with date ranges, results set options, constants
-- **Project:** package file tree, git repo status
-- **Domain knowledge:** FFMP rules, STARFIT rules, flood operations, getting started guide
-- **Templates:** `pywrdrb://parameter/{class_name}`, `pywrdrb://reservoir/{reservoir_name}`
+**Topology & Data**
+| URI | Description |
+|---|---|
+| `pywrdrb://topology/network-graph` | Full river network topology (upstream, downstream, lags) |
+| `pywrdrb://topology/reservoir-list` | All 17 reservoirs with type, capacity, downstream connectivity |
+| `pywrdrb://topology/node-list` | All nodes organized by type (NYC, STARFIT, flood monitoring) |
+| `pywrdrb://data/inflow-types` | Available inflow types with date ranges and usage hints |
+| `pywrdrb://data/results-sets` | All results_set options with descriptions and valid loaders |
+| `pywrdrb://domain/constants` | Unit conversion constants (cfs_to_mgd, etc.) |
+| `pywrdrb://domain/rating-curves` | USGS rating curve metadata for flood monitoring gages |
+
+**API References**
+| URI | Description |
+|---|---|
+| `pywrdrb://api/parameter-class-index` | Table of all parameter classes with module and description |
+| `pywrdrb://api/model-builder-api` | ModelBuilder class method summary |
+| `pywrdrb://api/data-loader-api` | Data class hierarchy, methods, and results_set options |
+| `pywrdrb://api/post-processing-api` | Performance metrics and error metrics function signatures |
+| `pywrdrb://api/preprocessing-api` | Inflow prediction and preprocessing class/function signatures |
+| `pywrdrb://api/nyc-operations-config` | NYCOperationsConfig class methods for modifying FFMP rules |
+
+**Domain Knowledge Guides**
+| URI | Description |
+|---|---|
+| `pywrdrb://domain/ffmp-rules-summary` | FFMP drought levels, storage zones, MRF targets, delivery constraints |
+| `pywrdrb://domain/starfit-rules-summary` | STARFIT reservoir release policy and harmonic terms |
+| `pywrdrb://domain/flood-operations-summary` | Flood monitoring stages, thresholds, and responsive operations |
+| `pywrdrb://domain/post-processing-guide` | Performance metrics, shortfall analysis, and error metrics |
+| `pywrdrb://domain/preprocessing-guide` | Inflow prediction, flow preprocessing, and data retrieval |
+| `pywrdrb://domain/data-loading-guide` | Data loading patterns, results_set descriptions, HDF5 conventions |
+
+**Project**
+| URI | Description |
+|---|---|
+| `pywrdrb://project/package-structure` | Package file tree with module descriptions |
+| `pywrdrb://project/repo-status` | Current git branch, commits, and modified files |
+| `pywrdrb://project/getting-started` | Getting started guide with example workflow |
+
+**Parameterized Templates**
+| URI | Description |
+|---|---|
+| `pywrdrb://parameter/{class_name}` | Detailed info for a specific parameter class |
+| `pywrdrb://reservoir/{reservoir_name}` | Detailed info for a specific reservoir |
 
 ### Prompts (6)
 
@@ -182,11 +197,13 @@ pywrdrb-mcp/
 │   ├── server.py          # FastMCP entry point
 │   ├── config.py          # PYWRDRB_ROOT path
 │   ├── index/             # AST-based static analysis engine
-│   ├── tools/             # 19 MCP tools (8 modules)
-│   ├── resources/         # 15 MCP resources
-│   ├── prompts/           # 6 MCP prompt templates (how_to_* convention)
-│   └── content/           # Hand-written domain knowledge (markdown)
-├── examples/              # Usage guides and workflow examples
+│   │   ├── builder.py     # PywrDRBIndex — topology, lists, capacity, rating curves
+│   │   ├── ast_utils.py   # Safe AST extraction utilities
+│   │   └── file_utils.py  # File system utilities
+│   ├── tools/             # 14 MCP tools (8 modules)
+│   ├── resources/         # 22 MCP resources
+│   ├── prompts/           # 6 MCP prompt templates
+│   └── content/           # Hand-written domain knowledge (7 markdown files)
 └── tests/
 ```
 
