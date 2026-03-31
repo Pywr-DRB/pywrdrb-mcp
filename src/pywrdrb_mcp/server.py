@@ -25,10 +25,10 @@ mcp = FastMCP(
     ),
 )
 
-# Build the index once at startup (singleton to avoid double-build on reimport)
 _index_instance: PywrDRBIndex | None = None
 
 
+# Build the index once at startup
 def _get_index() -> PywrDRBIndex:
     global _index_instance
     if _index_instance is None:

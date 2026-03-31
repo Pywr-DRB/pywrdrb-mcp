@@ -109,6 +109,10 @@ Use the `get_parameter_class_info` tool to inspect any existing class for detail
     ]
 
 
+
+
+
+
 @mcp.prompt()
 def how_to_debug_simulation() -> list[Message]:
     """How to debug a Pywr-DRB simulation that fails or produces unexpected results."""
@@ -410,7 +414,7 @@ mb.make_model()
 
 
 @mcp.prompt()
-def how_to_review_output() -> list[Message]:
+def how_to_access_output() -> list[Message]:
     """How to load and interpret Pywr-DRB simulation results."""
     return [
         Message(
@@ -420,7 +424,7 @@ def how_to_review_output() -> list[Message]:
         Message(
             role="assistant",
             content="""\
-# How to Review Simulation Output
+# How to Access Simulation Output
 
 ## Step 1: Load results with the Data class
 
